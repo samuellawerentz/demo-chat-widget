@@ -1,7 +1,53 @@
-(function() {
+(async function () {
   document.head.insertAdjacentHTML('beforeend', '<link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.16/tailwind.min.css" rel="stylesheet">');
-
+  const { init, tx, id } = await import('./core/out/index.js');
   // Inject the CSS
+  // ID for app: cx-service
+  const APP_ID = '82da8809-d12d-4336-b32d-8435902a20ce'
+  const db = init({ appId: APP_ID });
+  let conversationId = localStorage.getItem('conversationId')
+
+  if(conversationId) startListening();
+  let agents = []
+
+  db.subscribeQuery({
+    agents: {}
+  }, (resp) => {
+    if (resp.error) {
+      return;
+    }
+    if (resp.data) {
+      console.log(resp.data);
+      agents = resp.data.agents;
+    }
+  });
+
+  let isFirstLoad = true;
+  function startListening() {
+    console.log('startListening', conversationId);
+    db.subscribeQuery({ conversations: {
+      $: {
+        where: {
+          id: conversationId,
+        },
+      },
+      chunks: {}
+    } }, (resp) => {
+      if (resp.data) {
+        const chatMessages = document.getElementById('chat-messages');
+    chatMessages.innerHTML = ''
+        const conversationChunks = resp.data.conversations[0].chunks;
+          conversationChunks.forEach((chunk) => {
+            reply(chunk);
+          });
+      }
+    });
+  }
+
+
+
+
+
   const style = document.createElement('style');
   style.innerHTML = `
   .hidden {
@@ -40,7 +86,7 @@
   const chatWidgetContainer = document.createElement('div');
   chatWidgetContainer.id = 'chat-widget-container';
   document.body.appendChild(chatWidgetContainer);
-  
+
   // Inject the HTML
   chatWidgetContainer.innerHTML = `
     <div id="chat-bubble" class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center cursor-pointer text-3xl">
@@ -78,11 +124,11 @@
   const chatPopup = document.getElementById('chat-popup');
   const closePopup = document.getElementById('close-popup');
 
-  chatSubmit.addEventListener('click', function() {
-    
+  chatSubmit.addEventListener('click', function () {
+
     const message = chatInput.value.trim();
     if (!message) return;
-    
+
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     chatInput.value = '';
@@ -91,17 +137,17 @@
 
   });
 
-  chatInput.addEventListener('keyup', function(event) {
+  chatInput.addEventListener('keyup', function (event) {
     if (event.key === 'Enter') {
       chatSubmit.click();
     }
   });
 
-  chatBubble.addEventListener('click', function() {
+  chatBubble.addEventListener('click', function () {
     togglePopup();
   });
 
-  closePopup.addEventListener('click', function() {
+  closePopup.addEventListener('click', function () {
     togglePopup();
   });
 
@@ -111,42 +157,80 @@
     if (!chatPopup.classList.contains('hidden')) {
       document.getElementById('chat-input').focus();
     }
-  }  
+  }
+
+  const isFirstMessage = localStorage.getItem('conversationId') ? false : true;
 
   function onUserRequest(message) {
     // Handle user request here
     console.log('User request:', message);
-  
+
+    if (isFirstMessage) {
+      conversationId = id();
+      localStorage.setItem('conversationId', conversationId);
+      const name = ['Anant Kapoor', 'Rajesh Kumar', 'Sam Smith', 'Wolverine Deadpool', 'Neo Anderson'][Math.floor(Math.random() * 5)];
+      db.transact([
+        tx.conversations[conversationId].update({
+          createdAt: Date.now(),
+          customerName: name,
+          customerEmail: `${name.split(' ')[0].toLowerCase()}@test-plivo.com`
+        }).link({
+          assignedTo: 'fc1e5f9b-7f94-458c-8b03-603035c4d797' // update this logic
+        }),
+        tx.chunks[id()].update({
+          content: message,
+          actor: 'customer',
+          createdAt: Date.now()
+        }).link({
+          conversation: conversationId
+        })
+      ]
+      );
+      startListening();
+    } else {
+      db.transact([
+        tx.chunks[id()].update({
+          content: message,
+          actor: 'customer',
+          createdAt: Date.now()
+        }).link({
+          conversation: conversationId
+        })
+      ]);
+    }
+
     // Display user message
-    const messageElement = document.createElement('div');
-    messageElement.className = 'flex justify-end mb-3';
-    messageElement.innerHTML = `
-      <div class="bg-gray-800 text-white rounded-lg py-2 px-4 max-w-[70%]">
-        ${message}
-      </div>
-    `;
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  
+
     chatInput.value = '';
-  
-    // Reply to the user
-    setTimeout(function() {
-      reply('Hello! This is a sample reply.');
-    }, 1000);
+
   }
-  
+
   function reply(message) {
     const chatMessages = document.getElementById('chat-messages');
-    const replyElement = document.createElement('div');
-    replyElement.className = 'flex mb-3';
-    replyElement.innerHTML = `
+    const replyElement = (message) => {
+      const r = document.createElement('div');
+    r.className = 'flex mb-3';
+    r.innerHTML = `
       <div class="bg-gray-200 text-black rounded-lg py-2 px-4 max-w-[70%]">
         ${message}
       </div>
     `;
-    chatMessages.appendChild(replyElement);
+    return r;
+    }
+
+    const messageElement = (message) => {
+      const m = document.createElement('div');
+    m.className = 'flex justify-end mb-3';
+    m.innerHTML = `
+      <div class="bg-gray-800 text-white rounded-lg py-2 px-4 max-w-[70%]">
+        ${message}
+      </div>
+    `;
+    return m;
+    }
+    chatMessages.appendChild(message.actor === 'customer' ? messageElement(message.content) : replyElement(message.content))
+
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
-  
+
 })();
