@@ -101,7 +101,7 @@
     </div>
     <div id="chat-popup" class="hidden absolute bottom-20 right-0 w-96 bg-white rounded-md shadow-md flex flex-col transition-all text-sm">
       <div id="chat-header" class="flex justify-between items-center p-4 bg-gray-800 text-white rounded-t-md">
-        <h3 class="m-0 text-lg">Chat Widget by GPT4</h3>
+        <h3 class="m-0 text-lg">CX - Talk to us</h3>
         <button id="close-popup" class="bg-transparent border-none text-white cursor-pointer">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -115,7 +115,7 @@
           <button id="chat-submit" class="bg-gray-800 text-white rounded-md px-4 py-2 cursor-pointer">Send</button>
         </div>
         <div class="flex text-center text-xs pt-4">
-          <span class="flex-1">Prompted by <a href="https://twitter.com/anantrp" target="_blank" class="text-indigo-600">@anantrp</a></span>
+          <span class="flex-1">Powered by <a href="https://www.instantdb.com/" target="_blank" class="text-indigo-600">InstantDB</a></span>
         </div>
       </div>
     </div>
