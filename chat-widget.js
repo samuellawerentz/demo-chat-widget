@@ -25,6 +25,7 @@
   let isFirstLoad = true;
   function startListening() {
     console.log('startListening', conversationId);
+    localStorage.setItem('conversationId', conversationId);
     db.subscribeQuery({ conversations: {
       $: {
         where: {
@@ -36,10 +37,14 @@
       if (resp.data) {
         const chatMessages = document.getElementById('chat-messages');
     chatMessages.innerHTML = ''
-        const conversationChunks = resp.data.conversations[0].chunks;
-          conversationChunks.forEach((chunk) => {
+        const conversationChunks = resp.data.conversations[0]?.chunks;
+          conversationChunks?.forEach((chunk) => {
             reply(chunk);
           });
+          console.log('here', conversationChunks?.at(-1)?.content);
+          if(conversationChunks?.at(-1)?.content === "This conversation has been resolved and closed. You can start a new conversation again.") {
+            localStorage.removeItem('conversationId');
+          }
       }
     });
   }
@@ -159,23 +164,24 @@
     }
   }
 
-  const isFirstMessage = localStorage.getItem('conversationId') ? false : true;
 
-  function onUserRequest(message) {
+  async function onUserRequest(message) {
     // Handle user request here
+   const isFirstMessage = localStorage.getItem('conversationId') ? false : true;
     console.log('User request:', message);
 
     if (isFirstMessage) {
       conversationId = id();
       localStorage.setItem('conversationId', conversationId);
       const name = ['Anant Kapoor', 'Rajesh Kumar', 'Sam Smith', 'Wolverine Deadpool', 'Neo Anderson'][Math.floor(Math.random() * 5)];
-      db.transact([
+
+      await db.transact([
         tx.conversations[conversationId].update({
           createdAt: Date.now(),
           customerName: name,
           customerEmail: `${name.split(' ')[0].toLowerCase()}@test-plivo.com`
         }).link({
-          assignedTo: 'fc1e5f9b-7f94-458c-8b03-603035c4d797' // update this logic
+          publishedTo: agents.map(a => a.id)
         }),
         tx.chunks[id()].update({
           content: message,
@@ -183,9 +189,19 @@
           createdAt: Date.now()
         }).link({
           conversation: conversationId
+        }),
+      ]);
+
+      await db.transact([
+        tx.chunks[id()].update({
+          content: 'Please wait while we connect you to an agent',
+          actor: 'bot',
+          createdAt: Date.now()
+        }).link({
+          conversation: conversationId
         })
-      ]
-      );
+      ]);
+
       startListening();
     } else {
       db.transact([
