@@ -6,6 +6,7 @@
   const APP_ID = '82da8809-d12d-4336-b32d-8435902a20ce'
   const db = init({ appId: APP_ID });
   let conversationId = localStorage.getItem('conversationId')
+  let conversationData = {}
 
   if(conversationId) startListening();
   let agents = []
@@ -32,15 +33,20 @@
           id: conversationId,
         },
       },
-      chunks: {}
+      chunks: {},
+      assignedTo: {}
     } }, (resp) => {
       if (resp.data) {
         const chatMessages = document.getElementById('chat-messages');
-    chatMessages.innerHTML = ''
         const conversationChunks = resp.data.conversations[0]?.chunks;
+        conversationData = resp.data.conversations[0]
+          if (conversationChunks && conversationChunks.length > 0) {
+    chatMessages.innerHTML = ''
+            console.log('whatsup', conversationChunks)
           conversationChunks?.forEach((chunk) => {
             reply(chunk);
           });
+        }
           console.log('here', conversationChunks?.at(-1)?.content);
           if(conversationChunks?.at(-1)?.content === "This conversation has been resolved and closed. You can start a new conversation again.") {
             localStorage.removeItem('conversationId');
@@ -201,6 +207,23 @@
           conversation: conversationId
         })
       ]);
+      // Start a 30-second timer to check if the conversation is accepted
+      setTimeout(async () => {
+        if (!conversationData?.assignedTo.length) {
+          // If the conversation is not accepted (assignedTo is empty), delete it
+          await db.transact([
+            tx.conversations[conversationId].delete(),
+          ]);
+          console.log('Conversation deleted due to no agent assignment within 30 seconds');
+          // Optionally, you can inform the user that their request has timed out
+          localStorage.removeItem('conversationId');
+
+          reply({
+            content: "We're sorry, but all our agents are currently busy. Please try again later.",
+            actor: 'bot'
+          });
+        }
+      }, 10000);
 
       startListening();
     } else {
